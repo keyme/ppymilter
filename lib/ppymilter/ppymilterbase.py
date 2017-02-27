@@ -76,35 +76,37 @@ COMMANDS = {
 # From sendmail's include/libmilter/mfdef.h
 NO_CALLBACKS = 127  # (all seven callback flags set: 1111111)
 CALLBACKS = {
-  'OnConnect':    0x00000001L,  # SMFIP_NOCONNECT # Skip SMFIC_CONNECT
-  'OnHelo':       0x00000002L,  # SMFIP_NOHELO    # Skip SMFIC_HELO
-  'OnMailFrom':   0x00000004L,  # SMFIP_NOMAIL    # Skip SMFIC_MAIL
-  'OnRcptTo':     0x00000008L,  # SMFIP_NORCPT    # Skip SMFIC_RCPT
-  'OnData':       0x00000200L,  # SMFIP_NODATA    # Skip SMFIC_DATA
-  'OnHeader':     0x00000020L,  # SMFIP_NOHDRS    # Skip SMFIC_HEADER
-  'OnEndHeaders': 0x00000040L,  # SMFIP_NOEOH     # Skip SMFIC_EOH
-  'OnBody':       0x00000010L,  # SMFIP_NOBODY    # Skip SMFIC_BODY
+  'OnConnect':    0x00000001,  # SMFIP_NOCONNECT # Skip SMFIC_CONNECT
+  'OnHelo':       0x00000002,  # SMFIP_NOHELO    # Skip SMFIC_HELO
+  'OnMailFrom':   0x00000004,  # SMFIP_NOMAIL    # Skip SMFIC_MAIL
+  'OnRcptTo':     0x00000008,  # SMFIP_NORCPT    # Skip SMFIC_RCPT
+  'OnData':       0x00000200,  # SMFIP_NODATA    # Skip SMFIC_DATA
+  'OnHeader':     0x00000020,  # SMFIP_NOHDRS    # Skip SMFIC_HEADER
+  'OnEndHeaders': 0x00000040,  # SMFIP_NOEOH     # Skip SMFIC_EOH
+  'OnBody':       0x00000010,  # SMFIP_NOBODY    # Skip SMFIC_BODY
 }
 
 # Acceptable response commands/codes to return to sendmail (with accompanying
 # command data).  From sendmail's include/libmilter/mfdef.h
 RESPONSE = {
-  'ADDRCPT':    '+', # SMFIR_ADDRCPT    # "add recipient"
-  'DELRCPT':    '-', # SMFIR_DELRCPT    # "remove recipient"
-  'ACCEPT':     'a', # SMFIR_ACCEPT     # "accept"
-  'REPLBODY':   'b', # SMFIR_REPLBODY   # "replace body (chunk)"
-  'CONTINUE':   'c', # SMFIR_CONTINUE   # "continue"
-  'DISCARD':    'd', # SMFIR_DISCARD    # "discard"
-  'CONNFAIL':   'f', # SMFIR_CONN_FAIL  # "cause a connection failure"
-  'ADDHEADER':  'h', # SMFIR_ADDHEADER  # "add header"
-  'INSHEADER':  'i', # SMFIR_INSHEADER  # "insert header"
-  'CHGHEADER':  'm', # SMFIR_CHGHEADER  # "change header"
-  'PROGRESS':   'p', # SMFIR_PROGRESS   # "progress"
-  'QUARANTINE': 'q', # SMFIR_QUARANTINE # "quarantine"
-  'REJECT':     'r', # SMFIR_REJECT     # "reject"
-  'SETSENDER':  's', # v3 only?
-  'TEMPFAIL':   't', # SMFIR_TEMPFAIL   # "tempfail"
-  'REPLYCODE':  'y', # SMFIR_REPLYCODE  # "reply code etc"
+  'ADDRCPT':     '+', # SMFIR_ADDRCPT     # "add recipient"
+  'DELRCPT':     '-', # SMFIR_DELRCPT     # "remove recipient"
+  'ACCEPT':      'a', # SMFIR_ACCEPT      # "accept"
+  'REPLBODY':    'b', # SMFIR_REPLBODY    # "replace body (chunk)"
+  'CONTINUE':    'c', # SMFIR_CONTINUE    # "continue"
+  'DISCARD':     'd', # SMFIR_DISCARD     # "discard"
+  'CONNFAIL':    'f', # SMFIR_CONN_FAIL   # "cause a connection failure"
+  'ADDHEADER':   'h', # SMFIR_ADDHEADER   # "add header"
+  'INSHEADER':   'i', # SMFIR_INSHEADER   # "insert header"
+  'CHGHEADER':   'm', # SMFIR_CHGHEADER   # "change header"
+  'PROGRESS':    'p', # SMFIR_PROGRESS    # "progress"
+  'QUARANTINE':  'q', # SMFIR_QUARANTINE  # "quarantine"
+  'REJECT':      'r', # SMFIR_REJECT      # "reject"
+  'SETSENDER':   's', # v3 only?
+  'TEMPFAIL':    't', # SMFIR_TEMPFAIL    # "tempfail"
+  'REPLYCODE':   'y', # SMFIR_REPLYCODE   # "reply code etc"
+  'CHGFROM':     'e', # SMFIR_CHGFROM     # "change envelope sender"
+  'ADDRCPT_PAR': '2', # SMFIR_ADDRCPT_PAR # "add recipient with params
 }
 
 def printchar(char):
@@ -124,8 +126,8 @@ def CanonicalizeAddress(addr):
     The addr with leading and trailing angle brackets removed unless
     the address is "<>" (in which case the string is returned unchanged).
   """
-  if addr == '<>': return addr
-  return addr.lstrip('<').rstrip('>')
+  if addr == b'<>': return addr
+  return addr.lstrip(b'<').rstrip(b'>')
 
 
 class PpyMilterException(Exception):
@@ -190,7 +192,8 @@ class PpyMilterDispatcher(object):
       PpyMilterCloseConnection: Indicating the (milter) connection should
                                 be closed.
     """
-    (cmd, data) = (data[0], data[1:])
+    cmd = chr(data[0])
+    data = data[1:]
     try:
       if cmd not in COMMANDS:
         logger.warn('Unknown command code: "%s" ("%s")', cmd, data)
@@ -259,7 +262,7 @@ class PpyMilterDispatcher(object):
         data: A list of strings alternating between name, value of macro.
     """
     (macro, data) = (data[0], data[1:])
-    return (cmd, macro, data.split('\0'))
+    return (cmd, macro, data.split(b'\0'))
 
   def _ParseConnect(self, cmd, data):
     """Parse the 'Connect' milter data into arguments for the milter handler.
@@ -276,8 +279,8 @@ class PpyMilterDispatcher(object):
         port: The network port if appropriate for the connection.
         address: Remote address of the connection (e.g. IP address).
     """
-    (hostname, data) = data.split('\0', 1)
-    family = struct.unpack('c', data[0])[0]
+    (hostname, data) = data.split(b'\0', 1)
+    family = data[0]
     port = struct.unpack('!H', data[1:3])[0]
     address = data[3:]
     return (cmd, hostname, family, port, address)
@@ -309,8 +312,8 @@ class PpyMilterDispatcher(object):
         mailfrom: The canonicalized MAIL From email address.
         esmtp_info: Extended SMTP (esmtp) info as a list of strings.
     """
-    (mailfrom, esmtp_info) = data.split('\0', 1)
-    return (cmd, CanonicalizeAddress(mailfrom), esmtp_info.split('\0'))
+    (mailfrom, esmtp_info) = data.split(b'\0', 1)
+    return (cmd, CanonicalizeAddress(mailfrom), esmtp_info.split(b'\0'))
 
   def _ParseRcptTo(self, cmd, data):
     """Parse the 'RcptTo' milter data into arguments for the milter handler.
@@ -325,8 +328,8 @@ class PpyMilterDispatcher(object):
         rcptto: The canonicalized RCPT To email address.
         esmtp_info: Extended SMTP (esmtp) info as a list of strings.
     """
-    (rcptto, esmtp_info) = data.split('\0', 1)
-    return (cmd, CanonicalizeAddress(rcptto), esmtp_info.split('\0'))
+    (rcptto, esmtp_info) = data.split(b'\0', 1)
+    return (cmd, CanonicalizeAddress(rcptto), esmtp_info.split(b'\0'))
 
   def _ParseHeader(self, cmd, data):
     """Parse the 'Header' milter data into arguments for the milter handler.
@@ -341,8 +344,8 @@ class PpyMilterDispatcher(object):
         key: The name of the header.
         val: The value/data for the header.
     """
-    (key, val) = data.split('\0', 1)
-    val, _ = val.split('\0', 1)
+    (key, val) = data.split(b'\0', 1)
+    val, _ = val.split(b'\0', 1)
     return (cmd, key, val)
 
   def _ParseEndHeaders(self, cmd, data):
@@ -427,12 +430,14 @@ class PpyMilter(object):
   # Actions we tell sendmail we may perform
   # PpyMilter users invoke self.CanFoo() during their __init__()
   # to toggle these settings.
-  ACTION_ADDHDRS    = 1  # 0x01 SMFIF_ADDHDRS    # Add headers
-  ACTION_CHGBODY    = 2  # 0x02 SMFIF_CHGBODY    # Change body chunks
-  ACTION_ADDRCPT    = 4  # 0x04 SMFIF_ADDRCPT    # Add recipients
-  ACTION_DELRCPT    = 8  # 0x08 SMFIF_DELRCPT    # Remove recipients
-  ACTION_CHGHDRS    = 16 # 0x10 SMFIF_CHGHDRS    # Change or delete headers
-  ACTION_QUARANTINE = 32 # 0x20 SMFIF_QUARANTINE # Quarantine message
+  ACTION_ADDHDRS     = 1   # 0x01 SMFIF_ADDHDRS     # Add headers
+  ACTION_CHGBODY     = 2   # 0x02 SMFIF_CHGBODY     # Change body chunks
+  ACTION_ADDRCPT     = 4   # 0x04 SMFIF_ADDRCPT     # Add recipients
+  ACTION_DELRCPT     = 8   # 0x08 SMFIF_DELRCPT     # Remove recipients
+  ACTION_CHGHDRS     = 16  # 0x10 SMFIF_CHGHDRS     # Change or delete headers
+  ACTION_QUARANTINE  = 32  # 0x20 SMFIF_QUARANTINE  # Quarantine message
+  ACTION_CHGFROM     = 64  # 0x40 SMFIF_CHANGEFROM  # Change envelope sender
+  ACTION_ADDRCPT_PAR = 128 # 0x80 SMFIF_ADDRCPT_PAR # Add recipients with parameters
 
   def __init__(self):
     """Construct a PpyMilter object.  Sets callbacks and registers
@@ -442,7 +447,7 @@ class PpyMilter(object):
     """
     self.__actions = 0
     self.__protocol = NO_CALLBACKS
-    for (callback, flag) in CALLBACKS.iteritems():
+    for (callback, flag) in CALLBACKS.items():
       if hasattr(self, callback):
         self.__protocol &= ~flag
 
@@ -476,16 +481,44 @@ class PpyMilter(object):
             (https://www.sendmail.org/releases/8.13.0.html)
       text: Code reason/explanation to send to the user.
     """
-    return '%s%s %s\0' % (RESPONSE['REPLYCODE'], code, text)
+    return ('%s%s %s\0' % (RESPONSE['REPLYCODE'], code, text)).encode()
 
-  def AddRecipient(self, rcpt):
+  def ChangeFrom(self, frm, params):
+    """Construct an ADDRCPT reply that the client can send during OnEndBody.
+
+    Args:
+      frm: The sender to add, should have <> around it.
+      params: ESMTP parameters or None
+    """
+    self.__VerifyCapability(self.ACTION_CHGFROM)
+    result = '%s%s\0' % (RESPONSE['CHGFROM'], frm)
+    if params:
+      for param in params:
+        if param:
+          resultr += ('%s\0' % (param,))
+    return result.encode()
+
+  def AddRecipient(self, rcpt, params):
     """Construct an ADDRCPT reply that the client can send during OnEndBody.
 
     Args:
       rcpt: The recipient to add, should have <> around it.
+      params: ESMTP parameters or None
     """
     self.__VerifyCapability(self.ACTION_ADDRCPT)
-    return '%s%s\0' % (RESPONSE['ADDRCPT'], rcpt)
+    if params:
+      self.__VerifyCapability(self.ACTION_ADDRCPT_PAR)
+      paramstr = ''
+      for param in params:
+        if param:
+          paramstr += ('%s\0' % (param,))
+      if paramstr:
+        result = '%s%s\0%s' % (RESPONSE['ADDRCPT_PAR'], rcpt, paramstr)
+      else:
+        result = '%s%s\0' % (RESPONSE['ADDRCPT'], rcpt)
+    else:
+      result = '%s%s\0' % (RESPONSE['ADDRCPT'], rcpt)
+    return result.encode()
 
   def AddHeader(self, name, value):
     """Construct an ADDHEADER reply that the client can send during OnEndBody.
@@ -495,7 +528,7 @@ class PpyMilter(object):
       value: The value of the header
     """
     self.__VerifyCapability(self.ACTION_ADDHDRS)
-    return '%s%s\0%s\0' % (RESPONSE['ADDHEADER'], name, value)
+    return ('%s%s\0%s\0' % (RESPONSE['ADDHEADER'], name, value)).encode()
 
   def DeleteRecipient(self, rcpt):
     """Construct an DELRCPT reply that the client can send during OnEndBody.
@@ -504,7 +537,7 @@ class PpyMilter(object):
       rcpt: The recipient to delete, should have <> around it.
     """
     self.__VerifyCapability(self.ACTION_DELRCPT)
-    return '%s%s\0' % (RESPONSE['DELRCPT'], rcpt)
+    return ('%s%s\0' % (RESPONSE['DELRCPT'], rcpt)).encode()
 
   def InsertHeader(self, index, name, value):
     """Construct an INSHEADER reply that the client can send during OnEndBody.
@@ -517,7 +550,7 @@ class PpyMilter(object):
     """
     self.__VerifyCapability(self.ACTION_ADDHDRS)
     index = struct.pack('!I', index)
-    return '%s%s%s\0%s\0' % (RESPONSE['INSHEADER'], index, name, value)
+    return RESPONSE['INSHEADER'].encode() + index + ('{}\0{}\0'.format(name, value)).encode()
 
   def ChangeHeader(self, index, name, value):
     """Construct a CHGHEADER reply that the client can send during OnEndBody.
@@ -531,7 +564,21 @@ class PpyMilter(object):
     """
     self.__VerifyCapability(self.ACTION_CHGHDRS)
     index = struct.pack('!I', index)
-    return '%s%s%s\0%s\0' % (RESPONSE['CHGHEADER'], index, name, value)
+    return RESPONSE['CHGHEADER'].encode() + index + ('{}\0{}\0'.format(name, value)).encode()
+
+  def ChangeBody(self, body):
+    """Construct a REPLBODY reply that the client can send during OnEndBody.
+
+    Args:
+      body: The new body
+    """
+    self.__VerifyCapability(self.ACTION_CHGBODY)
+    result = RESPONSE['REPLBODY']
+    if body:
+      result += body
+      if body[-1] != '\n':
+        result += '\n'
+    return result.encode()
 
   def ReturnOnEndBodyActions(self, actions):
     """Construct an OnEndBody response that can consist of multiple actions
@@ -565,7 +612,7 @@ class PpyMilter(object):
                  actions=[AddHeader('Cc', 'lurker@example.com'),
                           AddRecipient('lurker@example.com')]
     """
-    return actions[:] + [self.Continue()]
+    return actions[:] + [self.Continue().encode()]
 
   def __ResetState(self):
     """Clear out any per-message data.
@@ -595,7 +642,7 @@ class PpyMilter(object):
     out = struct.pack('!III', MILTER_VERSION,
                       self.__actions & actions,
                       self.__protocol & protocol)
-    return cmd+out
+    return cmd.encode()+out
 
   def OnMacro(self, cmd, macro_cmd, data):
     """Callback for the 'Macro' milter command: no response required."""
@@ -659,6 +706,10 @@ class PpyMilter(object):
     """Register that our milter may perform the action 'ADDRCPT'."""
     self.__actions |= self.ACTION_ADDRCPT
 
+  def CanAddRecipientParams(self):
+    """Register that our milter may perform the action 'ADDRCPT_PAR'."""
+    self.__actions |= self.ACTION_ADDRCPT_PAR
+
   def CanDeleteRecipient(self):
     """Register that our milter may perform the action 'DELRCPT'."""
     self.__actions |= self.ACTION_DELRCPT
@@ -666,6 +717,10 @@ class PpyMilter(object):
   def CanChangeHeaders(self):
     """Register that our milter may perform the action 'CHGHDRS'."""
     self.__actions |= self.ACTION_CHGHDRS
+
+  def CanChangeFrom(self):
+    """Register that our milter may perform the action 'CHGFROM'."""
+    self.__actions |= self.ACTION_CHGFROM
 
   def CanQuarantine(self):
     """Register that our milter may perform the action 'QUARANTINE'."""

@@ -47,12 +47,16 @@ import binascii
 import logging
 import os
 import socket
-import SocketServer
 import struct
 import sys
 import time
 
-import ppymilterbase
+if sys.version_info[0] == 2:
+    import SocketServer
+else:
+    import socketserver as SocketServer
+
+from . import ppymilterbase
 
 logger = logging.getLogger('ppymilter')
 
@@ -100,7 +104,7 @@ class AsyncPpyMilterServer(asyncore.dispatcher):
       if connaddr is None:
         return
       (conn, addr) = connaddr
-    except socket.error, e:
+    except socket.error as e:
       logger.error('warning: server accept() threw an exception ("%s")',
                         str(e))
       return
@@ -148,7 +152,7 @@ class AsyncPpyMilterServer(asyncore.dispatcher):
     def read_packetlen(self):
       """Callback from asynchat once we have an integer accumulated in our
       input buffer (the milter packet length)."""
-      packetlen = int(struct.unpack('!I', "".join(self.__input))[0])
+      packetlen = int(struct.unpack('!I', b"".join(self.__input))[0])
       self.__input = []
       self.set_terminator(packetlen)
       self.found_terminator = self.read_milter_data
@@ -159,7 +163,9 @@ class AsyncPpyMilterServer(asyncore.dispatcher):
       Args:
         response: The data to send.
       """
-      logger.debug('  >>> %s', binascii.b2a_qp(response[0]))
+      if isinstance(response, str):
+          response = response.encode()
+      logger.debug('  >>> %s', binascii.b2a_qp(chr(response[0]).encode()))
       self.push(struct.pack('!I', len(response)))
       self.push(response)
 
@@ -167,7 +173,7 @@ class AsyncPpyMilterServer(asyncore.dispatcher):
       """Callback from asynchat once we have read the milter packet length
       worth of bytes on the socket and it is accumulated in our input buffer
       (which is the milter command + data to send to the dispatcher)."""
-      inbuff = "".join(self.__input)
+      inbuff = b"".join(self.__input)
       self.__input = []
       logger.debug('  <<< %s', binascii.b2a_qp(inbuff))
       try:
@@ -181,7 +187,7 @@ class AsyncPpyMilterServer(asyncore.dispatcher):
         # rinse and repeat :)
         self.found_terminator = self.read_packetlen
         self.set_terminator(MILTER_LEN_BYTES)
-      except ppymilterbase.PpyMilterCloseConnection, e:
+      except ppymilterbase.PpyMilterCloseConnection as e:
         logger.info('Closing connection ("%s")', str(e))
         self.close()
 
@@ -213,7 +219,9 @@ class ThreadedPpyMilterServer(SocketServer.ThreadingTCPServer):
       Args:
         response: the data to send
       """
-      logger.debug('  >>> %s', binascii.b2a_qp(response[0]))
+      if isinstance(response, str):
+          response = response.encode()
+      logger.debug('  >>> %s', binascii.b2a_qp(chr(response[0]).encode()))
       self.request.send(struct.pack('!I', len(response)))
       self.request.send(response)
 
@@ -228,7 +236,7 @@ class ThreadedPpyMilterServer(SocketServer.ThreadingTCPServer):
             partial_data = self.request.recv(packetlen - read)
             inbuf.append(partial_data)
             read += len(partial_data)
-          data = "".join(inbuf)
+          data = b"".join(inbuf)
           logger.debug('  <<< %s', binascii.b2a_qp(data))
           try:
             response = self.__milter_dispatcher.Dispatch(data)
@@ -237,7 +245,7 @@ class ThreadedPpyMilterServer(SocketServer.ThreadingTCPServer):
                 self.__send_response(r)
             elif response:
               self.__send_response(response)
-          except ppymilterbase.PpyMilterCloseConnection, e:
+          except ppymilterbase.PpyMilterCloseConnection as e:
             logger.info('Closing connection ("%s")', str(e))
             break
       except Exception:
@@ -247,7 +255,6 @@ class ThreadedPpyMilterServer(SocketServer.ThreadingTCPServer):
         (nil, t, v, tbinfo) = asyncore.compact_traceback()
         logger.error('uncaptured python exception, closing channel %s '
                       '(%s:%s %s)' % (repr(self), t, v, tbinfo))
-
 
 # Allow running the library directly to demonstrate a simple example invocation.
 if __name__ == '__main__':
