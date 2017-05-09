@@ -495,7 +495,7 @@ class PpyMilter(object):
     if params:
       for param in params:
         if param:
-          resultr += ('%s\0' % (param,))
+          result += ('%s\0' % (param,))
     return result.encode()
 
   def AddRecipient(self, rcpt, params):
